@@ -2,6 +2,17 @@
 
 Python 3.11+ 計算核心與繁體中文網頁介面，重建參考截圖的斷面切換、尺寸輸入及檢核操作。V0.1 為可執行的工程分析開發版，未完成完整擋土牆設計驗證。
 
+## 直接使用網頁版（V0.2）
+
+開啟 <https://retaining-wall-analysis.davida02617.chatgpt.site>，不需要安裝 Python。
+目前網站僅專案擁有者可存取，使用建立網站的 ChatGPT 帳號登入。
+
+網頁版原始碼位於 `browser/`，支援電腦與手機、R1/R2/R3、多斷面新增、計算書預覽與列印、保存／匯入／匯出。計算在瀏覽器執行，專案資料保存在目前瀏覽器，不會跨裝置同步。原有 Python 本機版本保留。
+
+分析模型維持 V0.1 的乾土假設與範圍；17 項測試包含 129 組 Python／JavaScript 數值比對及 21 組無效輸入比對。數值比對不等同獨立工程認證。
+
+詳見 [網頁版說明](docs/WEB.md)。
+
 ## 立即啟動（DH91 / Windows）
 
 1. 解壓縮專案，建議放在 `D:\Projects\RetainingWall-Analysis`。
@@ -81,7 +92,7 @@ python -m unittest discover -s tests -v
 node --check retaining_wall/web/app.js
 ```
 
-Python 測試不需安裝套件。Node 僅供 JavaScript 語法檢查，日常操作不需要 Node。
+原有 Python 測試不需安裝套件。跨語言比對測試需要 Node，未安裝時跳過；GitHub Actions 已安裝 Node 並執行比對。日常操作不需要 Node。
 
 ## Docker
 
@@ -103,7 +114,7 @@ python -m retaining_wall.server
 
 Windows PowerShell 若不接受 `cd --`，可使用 `Set-Location .\\-RetainingWall-Analysis`。
 
-此專案有 Python API，GitHub Pages 單獨託管靜態檔案不能提供計算服務。
+原有 `retaining_wall/web/` 依賴 Python API；新增的 `browser/` 為獨立靜態網頁，可部署到 GitHub Pages 等靜態主機。
 
 ## 後續版本
 
