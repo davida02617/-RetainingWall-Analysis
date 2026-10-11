@@ -78,7 +78,7 @@ class CoreTests(unittest.TestCase):
     def test_bearing_requires_source_and_separate_values(self):
         r=analyze({'allowable_bearing':500,'ultimate_bearing':1500})
         self.assertEqual(r['static']['checks']['bearing_allowable']['status'],'pending')
-        r=analyze({'allowable_bearing':500,'ultimate_bearing':1500,'bearing_source':'測試報告 p.10'})
+        r=analyze({'allowable_bearing':500,'ultimate_bearing':1500,'bearing_source':'測試報告 p.10','regulation':'swc'})
         self.assertEqual(r['static']['checks']['bearing_allowable']['status'],'pass')
         self.assertAlmostEqual(r['static']['checks']['bearing_fs']['value'],1500/r['static']['pressure']['qmax'])
         r=analyze({'allowable_bearing':1,'bearing_source':'測試報告'})

@@ -20,7 +20,7 @@ class ApiTests(unittest.TestCase):
         with urlopen(self.url+'/api/presets') as r:self.assertEqual(len(json.load(r)['walls']),3)
     def test_analyze(self):
         req=Request(self.url+'/api/analyze',data=b'{}',headers={'Content-Type':'application/json'})
-        with urlopen(req) as r:self.assertEqual(json.load(r)['engine_version'],'0.1.0')
+        with urlopen(req) as r:self.assertEqual(json.load(r)['engine_version'],'0.3.0')
     def test_bad_inputs(self):
         for payload in (b'[]',b'{',b'{"height":-1}'):
             with self.assertRaises(HTTPError) as err:urlopen(Request(self.url+'/api/analyze',data=payload))

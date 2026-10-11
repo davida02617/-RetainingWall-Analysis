@@ -18,3 +18,4 @@ jobs:
       - run: node --check retaining_wall/web/app.js
       - run: node --check browser/app.mjs
       - run: node --check browser/engine.mjs
+      - run: python scripts/sync_browser_model.py --check

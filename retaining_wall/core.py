@@ -2,7 +2,9 @@
 from dataclasses import dataclass, asdict, fields
 from math import radians, tan, sin, cos, sqrt, atan2, isfinite
 
-VERSION = '0.1.0'
+from .regulations import PROFILES, MOVEMENTS, LOAD_CASES, REFERENCES, REVIEW_DATE, ASSUMPTIONS, OUTSTANDING
+
+VERSION = '0.3.0'
 SOURCE = 'https://law.moa.gov.tw/LawContent.aspx?id=FL014521'
 
 @dataclass
@@ -26,6 +28,17 @@ class Wall:
     ultimate_bearing: float | None = None
     bearing_source: str = ''
     foundation: str = 'soil'
+    regulation: str = 'unconfirmed'
+    design_basis: str = ''
+    soil_source: str = ''
+    seismic_source: str = ''
+    model_source: str = ''
+    load_source: str = ''
+    movement: str = 'toe_rotation'
+    exposed_height: float | None = None
+    overburden_pressure: float | None = None
+    allowable_bearing_seismic: float | None = None
+    ultimate_bearing_seismic: float | None = None
     groundwater_height: float = 0.0
     backfill_slope: float = 0.0
     cohesion: float = 0.0
@@ -41,10 +54,10 @@ class Wall:
         w = cls(**data)
         for f in fields(cls):
             v = getattr(w, f.name)
-            if f.name in ('name', 'wall_type', 'foundation', 'bearing_source'):
+            if f.name in ('name', 'wall_type', 'foundation', 'bearing_source', 'regulation', 'design_basis', 'soil_source', 'seismic_source', 'model_source', 'load_source', 'movement'):
                 if not isinstance(v, str) or len(v) > 200:
                     raise ValueError(f'{f.name} 必須為 200 字內文字')
-            elif v is None and f.name in ('allowable_bearing', 'ultimate_bearing'):
+            elif v is None and f.name in ('allowable_bearing', 'ultimate_bearing', 'allowable_bearing_seismic', 'ultimate_bearing_seismic', 'overburden_pressure', 'exposed_height'):
                 continue
             elif isinstance(v, bool) or not isinstance(v, (int, float)) or not isfinite(v):
                 raise ValueError(f'{f.name} 必須為有限數值')
@@ -54,13 +67,22 @@ class Wall:
         for key in ('gamma_concrete', 'gamma_soil'):
             if getattr(w, key) > 50:
                 raise ValueError(f'{key} 超過本版 50 kN/m³ 範圍')
-        for key in ('surcharge', 'allowable_bearing', 'ultimate_bearing'):
+        for key in ('surcharge', 'allowable_bearing', 'ultimate_bearing', 'allowable_bearing_seismic', 'ultimate_bearing_seismic', 'overburden_pressure'):
             if getattr(w, key) is not None and abs(getattr(w, key)) > 1e6:
                 raise ValueError(f'{key} 超過本版 1e6 kPa 範圍')
         if not w.name.strip():
             raise ValueError('斷面名稱不得空白')
         if w.wall_type not in ('cantilever', 'gravity') or w.foundation not in ('soil', 'rock'):
             raise ValueError('不支援的牆型或基礎種類')
+        if w.regulation not in PROFILES or w.movement not in MOVEMENTS:
+            raise ValueError('不支援的法規或位移模式')
+        if w.exposed_height is not None and not 0 < w.exposed_height <= w.height + w.base_thickness:
+            raise ValueError('有效露出高度須大於零且不得超過斷面總高')
+        if w.overburden_pressure is not None and w.overburden_pressure < 0:
+            raise ValueError('開挖前覆土壓力不得為負')
+        for key in ('ultimate_bearing', 'ultimate_bearing_seismic'):
+            if getattr(w, key) is not None and w.overburden_pressure is not None and getattr(w, key) <= w.overburden_pressure:
+                raise ValueError('gross 極限承載力須大於開挖前覆土壓力')
         for key in ('height', 'base_thickness', 'stem_top', 'stem_bottom', 'gamma_concrete', 'gamma_soil'):
             if getattr(w, key) <= 0:
                 raise ValueError(f'{key} 必須大於零')
@@ -68,12 +90,12 @@ class Wall:
             raise ValueError('趾、踵、載重不得為負；牆頂厚不得超過牆底厚')
         if not 0 <= w.phi < 50 or not 0 <= w.friction <= 1 or not 0 <= w.kh <= 0.5 or not 0 <= w.kv < 0.5:
             raise ValueError('φ 需為 0–<50°、μ 為 0–1、kh 為 0–0.5、|kv| 為 0–<0.5')
-        for key in ('allowable_bearing', 'ultimate_bearing'):
+        for key in ('allowable_bearing', 'ultimate_bearing', 'allowable_bearing_seismic', 'ultimate_bearing_seismic'):
             if getattr(w, key) is not None and getattr(w, key) <= 0:
                 raise ValueError(f'{key} 必須大於零或留空')
         for key in ('groundwater_height', 'backfill_slope', 'cohesion', 'wall_friction'):
             if getattr(w, key) != 0:
-                raise ValueError(f'V0.1 未支援 {key} 非零；不得以乾土模式代算')
+                raise ValueError(f'本版未支援 {key} 非零；不得以乾土模式代算')
         return w
 
 
@@ -109,11 +131,17 @@ def contact(normal, width, resultant):
     return {'mode': 'partial', 'qmax': 2 * normal / b, 'qmin': 0.0, 'contact_width': b}
 
 
-def check(value, limit, upper=False):
-    return {'value': value, 'limit': limit, 'status': 'pending' if value is None else ('pass' if (value <= limit if upper else value >= limit) else 'fail')}
+def check(value, limit, upper=False, strict=False, basis=''):
+    ok = value is not None and limit is not None and (value <= limit if upper else value > limit if strict else value >= limit)
+    return {'value': value, 'limit': limit, 'operator': '≤' if upper else '>' if strict else '≥',
+            'basis': basis, 'status': 'pending' if value is None or limit is None else 'pass' if ok else 'fail'}
 
 
-def analyze_case(w, seismic=False, kv=0.0):
+def case_id(seismic, kv, loading):
+    return ('E' if seismic else 'S') + ':' + ('positive' if kv > 0 else 'negative' if kv < 0 else 'zero') + ':' + loading
+
+
+def analyze_case(w, seismic=False, kv=0.0, loading='lateral_only'):
     h, t = w.height, w.base_thickness
     b = w.toe + w.stem_bottom + w.heel
     rear = w.toe + w.stem_bottom
@@ -122,17 +150,26 @@ def analyze_case(w, seismic=False, kv=0.0):
     loads = [dict(name='底版', weight=b*t*w.gamma_concrete, x=b/2, y=t/2),
              dict(name='牆身', weight=area*w.gamma_concrete, x=cx, y=cy),
              dict(name='踵上背填土', weight=w.heel*h*w.gamma_soil, x=rear+w.heel/2, y=t+h/2)]
-    # Virtual vertical back at heel edge, from foundation underside to ground.
     earth_h = h + t
+    q = 0.0 if loading == 'none' else w.surcharge
+    if loading == 'full':
+        loads.append(dict(name='踵上均佈載重', weight=q*w.heel, x=rear+w.heel/2, y=earth_h))
     kh = w.kh if seismic else 0.0
     k = coefficient(w.phi, kh, kv)
     ka = coefficient(w.phi)
     pa = .5*ka*w.gamma_soil*earth_h**2
     total = .5*k*w.gamma_soil*earth_h**2*(1-kv)
-    # Explicit modelling choice: static triangle plus delta at user-visible 0.6H.
     delta = total - pa
-    pq = k*w.surcharge*earth_h
-    moment_earth = pa*earth_h/3 + delta*.6*earth_h + pq*earth_h/2
+    pq = k*q*earth_h*(1-kv)
+    if not seismic or (kh == 0 and kv == 0):
+        ya, yd = 1/3, 1/3
+    else:
+        ya, yd = {'toe_rotation': (1/3, 2/3), 'translation': (.42, .48), 'top_rotation': (.55, .55)}[w.movement]
+    soil_moment = (pa*ya + delta*yd)*earth_h
+    earth_y = soil_moment/total
+    if not 0 <= earth_y <= earth_h:
+        raise ValueError('地震土壓合力作用點超出牆高；此增量分配模型不適用')
+    moment_earth = soil_moment + pq*earth_h/2
     inertial_h = sum(v['weight'] for v in loads)*kh
     moment_inertia = sum(v['weight']*kh*v['y'] for v in loads)
     n = sum(v['weight'] for v in loads)*(1-kv)
@@ -143,50 +180,107 @@ def analyze_case(w, seismic=False, kv=0.0):
     e = b/2-x
     pressure = contact(n, b, x)
     qmax = pressure['qmax']
+    building = w.regulation in ('building', 'both')
+    swc = w.regulation in ('swc', 'both', 'unconfirmed')
+    bearing_limit = 2.0 if seismic and w.regulation == 'building' else 3.0
+    bearing_strict = building and not (seismic and w.regulation == 'both')
+    qa = w.allowable_bearing_seismic if seismic and w.allowable_bearing_seismic is not None else w.allowable_bearing
+    qult = w.ultimate_bearing_seismic if seismic and w.ultimate_bearing_seismic is not None else w.ultimate_bearing
+    q0 = w.overburden_pressure
+    fs_gross = qult/qmax if qult is not None and qmax else None
+    fs_net = (qult-q0)/(qmax-q0) if qult is not None and q0 is not None and qmax is not None and qmax > q0 else None
+    # SWC does not specify a net conversion: retain its gross comparison as well.
+    fs_bearing = min(fs_gross, fs_net) if w.regulation == 'both' and fs_net is not None else fs_net if building else fs_gross
+    legal_basis = '水保 §120；基礎規範 §7.4' if w.regulation == 'both' else '基礎規範 §7.4' if building else '水保 §120'
+    e_limit = b/(4 if swc and not building and w.foundation == 'rock' else 6)
     checks = {
-        'overturning': check(mr/mo if mo > 0 else None, 1.5 if seismic else 2.0),
-        'sliding': check(w.friction*n/horizontal if horizontal > 0 else None, 1.2 if seismic else 1.5),
-        'eccentricity': check(abs(e), b/(4 if w.foundation == 'rock' else 6), True),
-        'bearing_allowable': check(qmax, w.allowable_bearing, True) if w.allowable_bearing is not None else check(None, None),
-        'bearing_fs': check(w.ultimate_bearing/qmax if w.ultimate_bearing is not None and qmax else None, 3.0),
+        'overturning': check(mr/mo if mo > 0 else None, 1.5 if seismic else 2.0, strict=building, basis=legal_basis),
+        'sliding': check(w.friction*n/horizontal if horizontal > 0 else None, 1.2 if seismic else 1.5, strict=building, basis=legal_basis),
+        'eccentricity': check(abs(e), e_limit, True, basis='水保 §120' if swc and not building else '本模型採 B/6 不受拉條件' + ('；並滿足水保 §120' if swc else '')),
+        'bearing_allowable': check(qmax, qa, True, basis='使用者地勘 gross qa；建築構造編 §121-3／水保 §120'),
+        'bearing_fs': check(fs_bearing, bearing_limit, strict=bearing_strict, basis=legal_basis + ('；淨值依 §4.3.5' if building else '；gross 比值')),
     }
     if pressure['mode'] == 'unstable':
-        checks['bearing_allowable']['status'] = 'fail'
-        checks['bearing_fs']['status'] = 'fail'
+        for key in ('bearing_allowable', 'bearing_fs'):
+            checks[key]['status'] = 'fail'
     if not w.bearing_source.strip():
         for key in ('bearing_allowable', 'bearing_fs'):
             if checks[key]['status'] == 'pass':
                 checks[key]['status'] = 'pending'
+    if w.regulation == 'unconfirmed':
+        for item in checks.values():
+            if item['status'] == 'pass':
+                item['status'] = 'pending'
+    missing = [label for value, label in [(w.design_basis, '案件法規適用依據'), (w.soil_source, '土壤與摩擦參數來源'),
+               (w.model_source, '乾土及主動位移條件依據')] if not value.strip()]
+    if seismic and not w.seismic_source.strip():
+        missing.append('工址地震參數來源')
+    if w.surcharge > 0 and not w.load_source.strip():
+        missing.append('載重性質與組合依據')
     statuses = [v['status'] for v in checks.values()]
-    status = 'fail' if 'fail' in statuses else ('pending' if 'pending' in statuses else 'pass')
-    return {'case': 'seismic' if seismic else 'static', 'kv': kv, 'status': status, 'checks': checks,
-            'width': b, 'earth_height': earth_h, 'ka': ka, 'kae': k, 'normal': n,
+    status = 'fail' if 'fail' in statuses else 'pending' if 'pending' in statuses or missing else 'pass'
+    return {'case': 'seismic' if seismic else 'static', 'kv': kv, 'id': case_id(seismic, kv, loading),
+            'loading': loading, 'status': status, 'checks': checks, 'missing': missing,
+            'width': b, 'earth_height': earth_h, 'earth_application_height': earth_y,
+            'static_height_ratio': ya, 'delta_height_ratio': yd, 'ka': ka, 'kae': k, 'normal': n,
             'earth_force': total, 'static_earth_force': pa, 'delta_earth_force': delta,
             'surcharge_force': pq, 'inertia_force': inertial_h, 'horizontal': horizontal,
             'resisting_moment': mr, 'overturning_moment': mo, 'resultant_x': x, 'eccentricity': e,
+            'bearing': {'qa': qa, 'qult': qult, 'q0': q0, 'fs_gross': fs_gross, 'fs_net': fs_net},
             'pressure': pressure, 'loads': loads, 'stem_polygon': polygon}
+
+
+def envelope(cases):
+    result = {}
+    for key in ('overturning', 'sliding', 'eccentricity', 'bearing_allowable', 'bearing_fs'):
+        valid = [c for c in cases if 'checks' in c and c['checks'][key]['value'] is not None]
+        upper = key in ('eccentricity', 'bearing_allowable')
+        def ratio(c):
+            item = c['checks'][key]
+            return item['value']/item['limit'] if item['limit'] else item['value']
+        governing = (max if upper else min)(valid, key=ratio) if valid else None
+        unresolved = [c for c in cases if 'checks' not in c or c['checks'][key]['status'] == 'fail' and c['checks'][key]['value'] is None]
+        failed = [c for c in cases if 'checks' in c and c['checks'][key]['status'] == 'fail']
+        invalid_failed = [c for c in failed if c['checks'][key]['value'] is None]
+        if invalid_failed:
+            governing = invalid_failed[0]
+        elif unresolved and not failed:
+            governing = unresolved[0]
+        statuses = [c['checks'][key]['status'] if 'checks' in c else 'unsupported' for c in cases]
+        status = 'fail' if 'fail' in statuses else 'unsupported' if 'unsupported' in statuses else 'pending' if 'pending' in statuses else 'pass'
+        result[key] = dict(value=governing['checks'][key]['value'] if governing and 'checks' in governing else None,
+                           case_id=governing['id'] if governing else None, status=status)
+    return result
 
 
 def analyze(data):
     w = Wall.parse(data)
-    static = analyze_case(w)
-    seismic = []
-    for kv in sorted({w.kv, -w.kv}):
+    def run(seismic=False, kv=0.0, loading='lateral_only'):
         try:
-            seismic.append(analyze_case(w, True, kv))
+            return analyze_case(w, seismic, kv, loading)
         except ValueError as exc:
-            seismic.append({'case': 'seismic', 'kv': kv, 'status': 'unsupported', 'error': str(exc)})
+            return {'case': 'seismic' if seismic else 'static', 'kv': kv, 'loading': loading,
+                    'id': case_id(seismic, kv, loading), 'status': 'unsupported', 'error': str(exc)}
+    static = run()
+    directions = sorted({w.kv, -w.kv})
+    seismic = [run(True, kv) for kv in directions]
+    additional = []
+    if w.surcharge > 0:
+        for loading in (['none', 'full'] if w.heel > 0 else ['none']):
+            additional.append(run(loading=loading))
+            additional.extend(run(True, kv, loading) for kv in directions)
+    cases = [static, *seismic, *additional]
+    height_limit = 4 if w.wall_type == 'gravity' else 8
+    height_review = {'status': 'pending', 'value': w.exposed_height, 'limit': height_limit if w.regulation in ('swc', 'both') else None,
+                     'reason': '水保 §118 以有效露出高度為準；超過原則高度需專業技師安全分析。' if w.regulation in ('swc', 'both') else '高度適用條件由案件確認。'}
+    if w.regulation in ('swc', 'both') and w.exposed_height is not None:
+        height_review['status'] = 'pass' if w.exposed_height <= height_limit else 'pending'
     return {'engine_version': VERSION, 'input': asdict(w), 'static': static, 'seismic': seismic,
-            'rc': {'status': 'pending', 'reason': '尚未實作牆身／底版強度、配筋、裂縫及錨定檢核'},
-            'overall_status': 'incomplete', 'source': SOURCE,
-            'assumptions': ['每延米，m／kN／kPa；乾燥均質無凝聚土、水平填土、垂直光滑虛擬牆背。',
-                '土壓作用面為踵端，自基底至填土頂；H土壓＝牆身高＋底版厚。',
-                '不採計被動土壓、黏著及地表載重的穩定重量；地震慣性包括牆體與踵上土重。',
-                '地震總土壓採限制版 M–O；常時分量作用於 H/3、增量作用於 0.6H（模型假設）。',
-                '地表載重側壓採 Kae·q，未含交通動力放大；kv 正值降低重力，分析 ±|kv|。',
-                'qa、qult 均由使用者提供基底 gross 值，兩工況沿用，不自動提高；缺數據或來源則待確認。',
-                '部分接觸仍計算壓力；偏心距依土層 B/6、岩盤 B/4 獨立判定。',
-                '未含水壓、揚壓、沉陷、整體邊坡穩定及 RC 設計；不作完整設計合格判定。']}
+            'additional_cases': additional, 'envelope': envelope(cases), 'height_review': height_review,
+            'regulation': {'id': w.regulation, 'name': PROFILES[w.regulation], 'review_date': REVIEW_DATE},
+            'references': REFERENCES, 'outstanding': [dict(v, status='pending') for v in OUTSTANDING],
+            'rc': {'status': 'pending', 'reason': '牆身／底版強度、材料應力、配筋、裂縫及錨定尚未檢核'},
+            'overall_status': 'incomplete', 'source': SOURCE, 'assumptions': ASSUMPTIONS}
 
 
 def presets():

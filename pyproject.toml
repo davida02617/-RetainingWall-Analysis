@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "retaining-wall-analysis"
-version = "0.1.0"
+version = "0.3.0"
 description = "Traceable retaining wall stability analysis with a Traditional Chinese local web UI"
 requires-python = ">=3.11"
 dependencies = []
@@ -16,4 +16,4 @@ retaining-wall = "retaining_wall.server:main"
 packages = ["retaining_wall"]
 
 [tool.setuptools.package-data]
-retaining_wall = ["web/*"]
+retaining_wall = ["web/*", "web/professional/*"]

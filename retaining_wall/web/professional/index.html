@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="擋土牆分析檢核：懸臂式、重力式，常時及地震穩定分析。支援斷面預覽、專案保存與計算報告。">
+<meta name="theme-color" content="#205f96"><title>擋土牆分析檢核</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<header><div><span class="eyebrow">RETAINING WALL ANALYSIS</span><h1>擋土牆分析檢核</h1><p>懸臂式與重力式，常時與地震。台灣法規分流、控制工況包絡與可追溯計算書。</p></div><span class="version">專業檢討版 0.3</span></header>
+<div id="workspace">
+<nav id="tabs" aria-label="擋土牆斷面"></nav>
+<section class="toolbar" aria-label="專案操作"><button id="copy">複製計算摘要</button><button id="report" class="primary">成果報告書（1 道）</button><span class="spacer"></span><button id="save">保存專案</button><button id="export">匯出</button><button id="import-button">匯入</button><input id="import" type="file" accept="application/json,.json" hidden></section>
+<label class="project-label"><span class="sr-only">計畫名稱</span><input id="project" maxlength="200" placeholder="計畫名稱（計算書用）"></label>
+<section class="sectionbar"><span id="selected-name">R2 懸臂式擋土牆</span><button id="add">＋ 新增擋土牆</button></section>
+<section id="regulation-summary" class="regulation-summary" aria-live="polite"></section>
+<section id="overview" aria-label="檢核摘要" aria-live="polite"></section>
+<div class="model-note"><span class="dot"></span>乾土主動土壓模型 · 完整設計尚未完成 <button id="scope-link">查看適用範圍 ↓</button></div>
+<p id="message" role="status"></p>
+<div class="layout">
+<section class="inputs" aria-label="輸入參數"><form id="form"></form></section>
+<section class="output">
+<article class="card drawing"><div class="cardhead"><h2>斷面預覽</h2><span>每延米 · m / kN / kPa</span></div><svg id="section" viewBox="0 0 600 400" role="img" aria-label="擋土牆斷面預覽"></svg><p id="geometry" class="footnote"></p></article>
+<article class="card"><h2>各工況檢核</h2><div id="results"></div></article>
+<article class="card"><h2>設計待辦與限制</h2><div id="review-list"></div></article>
+<article class="card" id="scope"><h2>計算明細與依據</h2><div id="details"></div></article>
+</section>
+</div></div>
+<section id="report-panel" hidden><div class="report-tools"><button id="back">← 返回分析</button><button id="print" class="primary">列印／另存 PDF</button></div><article id="report-document"></article></section>
+<footer><span>資料保存在此瀏覽器；建議匯出專案備份。</span><a href="https://github.com/davida02617/-RetainingWall-Analysis" target="_blank" rel="noopener">GitHub 原始碼 ↗</a></footer>
+<noscript>請啟用 JavaScript 才能執行分析。</noscript>
+</main>
+<script type="module" src="app.mjs"></script>
+</body></html>

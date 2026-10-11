@@ -5,7 +5,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from .core import analyze, presets, VERSION
 
-WEB = Path(__file__).resolve().parent / 'web'
+WEB = Path(__file__).resolve().parent / 'web' / 'professional'
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
