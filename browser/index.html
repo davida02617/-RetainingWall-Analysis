@@ -2,33 +2,49 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="擋土牆分析檢核：懸臂式、重力式，常時及地震穩定分析。支援斷面預覽、專案保存與計算報告。">
-<meta name="theme-color" content="#205f96"><title>擋土牆分析檢核</title><link rel="stylesheet" href="style.css">
+<meta name="description" content="擋土牆工程分析工作區：斷面尺寸、台灣法規依據、常時與地震穩定檢核及可追溯計算書。">
+<meta name="theme-color" content="#14283b"><title>擋土牆分析｜工程工作區</title><link rel="stylesheet" href="style.css">
 </head>
 <body>
+<a class="skip-link" href="#input-panel">跳至輸入參數</a>
+<svg class="icon-library" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h12l4 4v14H3V3zM7 3v7h10V3M7 21v-7h10v7"/></symbol>
+<symbol id="i-report" viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h8"/></symbol>
+<symbol id="i-out" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 15v6h16v-6"/></symbol>
+<symbol id="i-in" viewBox="0 0 24 24"><path d="M12 16V4m-5 5 5-5 5 5M4 15v6h16v-6"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><path d="M8 8h13v13H8zM16 8V3H3v13h5"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+</defs></svg>
+<header class="app-header">
+<div class="brand"><svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true"><path d="M8 32h26M8 8v24M14 8v18h20"/><path class="brand-dim" d="M3 8v24M1 8h4M1 32h4M14 36h20M14 34v4M34 34v4"/></svg><div><span class="eyebrow">RETAINING WALL ANALYSIS</span><h1>擋土牆分析<span>工程工作區</span></h1></div></div>
+<div class="header-meta"><span>台灣規範 · SI 制</span><span class="version">UI 0.3.1</span></div>
+</header>
 <main>
-<header><div><span class="eyebrow">RETAINING WALL ANALYSIS</span><h1>擋土牆分析檢核</h1><p>懸臂式與重力式，常時與地震。台灣法規分流、控制工況包絡與可追溯計算書。</p></div><span class="version">專業檢討版 0.3</span></header>
 <div id="workspace">
-<nav id="tabs" aria-label="擋土牆斷面"></nav>
-<section class="toolbar" aria-label="專案操作"><button id="copy">複製計算摘要</button><button id="report" class="primary">成果報告書（1 道）</button><span class="spacer"></span><button id="save">保存專案</button><button id="export">匯出</button><button id="import-button">匯入</button><input id="import" type="file" accept="application/json,.json" hidden></section>
-<label class="project-label"><span class="sr-only">計畫名稱</span><input id="project" maxlength="200" placeholder="計畫名稱（計算書用）"></label>
-<section class="sectionbar"><span id="selected-name">R2 懸臂式擋土牆</span><button id="add">＋ 新增擋土牆</button></section>
-<section id="regulation-summary" class="regulation-summary" aria-live="polite"></section>
-<section id="overview" aria-label="檢核摘要" aria-live="polite"></section>
-<div class="model-note"><span class="dot"></span>乾土主動土壓模型 · 完整設計尚未完成 <button id="scope-link">查看適用範圍 ↓</button></div>
-<p id="message" role="status"></p>
-<div class="layout">
-<section class="inputs" aria-label="輸入參數"><form id="form"></form></section>
-<section class="output">
-<article class="card drawing"><div class="cardhead"><h2>斷面預覽</h2><span>每延米 · m / kN / kPa</span></div><svg id="section" viewBox="0 0 600 400" role="img" aria-label="擋土牆斷面預覽"></svg><p id="geometry" class="footnote"></p></article>
-<article class="card"><h2>各工況檢核</h2><div id="results"></div></article>
-<article class="card"><h2>設計待辦與限制</h2><div id="review-list"></div></article>
-<article class="card" id="scope"><h2>計算明細與依據</h2><div id="details"></div></article>
+<section class="commandbar" aria-label="專案操作">
+<label class="project-label"><span>工程計畫</span><input id="project" maxlength="200" placeholder="輸入計畫名稱" autocomplete="off"></label>
+<div class="toolbar"><button id="save"><svg class="icon"><use href="#i-save"/></svg>保存</button><button id="import-button"><svg class="icon"><use href="#i-in"/></svg>匯入</button><button id="export"><svg class="icon"><use href="#i-out"/></svg>匯出</button><button id="copy" title="複製計算摘要"><svg class="icon"><use href="#i-copy"/></svg><span>複製摘要</span></button><button id="report" class="primary"><svg class="icon"><use href="#i-report"/></svg>產出計算書</button><input id="import" type="file" accept="application/json,.json" hidden></div>
 </section>
-</div></div>
-<section id="report-panel" hidden><div class="report-tools"><button id="back">← 返回分析</button><button id="print" class="primary">列印／另存 PDF</button></div><article id="report-document"></article></section>
-<footer><span>資料保存在此瀏覽器；建議匯出專案備份。</span><a href="https://github.com/davida02617/-RetainingWall-Analysis" target="_blank" rel="noopener">GitHub 原始碼 ↗</a></footer>
+<div class="section-tabs"><span class="rail-label">分析斷面</span><nav id="tabs" aria-label="擋土牆斷面"></nav><button id="add" title="新增擋土牆斷面"><svg class="icon"><use href="#i-plus"/></svg><span>新增斷面</span></button></div>
+<div class="workspace-title"><div><span class="section-tag">CURRENT SECTION</span><h2 id="selected-name">R2 懸臂式擋土牆</h2></div><nav class="jump-nav" aria-label="工作區導覽"><a href="#drawing-panel">斷面圖</a><a href="#results-panel">穩定檢核</a><a href="#review-panel">設計待辦</a><a href="#scope">計算依據</a></nav></div>
+<section id="regulation-summary" class="regulation-summary" aria-label="案件設計依據"></section>
+<div class="overview-head"><h2>控制工況總覽</h2><span>逐項包絡 · 原始精度判定</span></div>
+<section id="overview" aria-label="檢核摘要" aria-live="polite"></section>
+<div class="statusbar"><p id="message" role="status"></p><button id="scope-link"><span class="dot"></span>乾土主動土壓模型 · 適用範圍</button></div>
+<div class="layout">
+<aside class="inputs" id="input-panel" aria-label="輸入參數"><div class="panel-heading"><div><span class="section-number">01</span><h2>設計參數</h2></div><span>輸入後即時更新</span></div><form id="form"></form></aside>
+<section class="output" aria-label="分析成果">
+<article class="card drawing" id="drawing-panel"><div class="panel-heading"><div><span class="section-number">02</span><h2>擋土牆斷面</h2></div><span>每延米 · m / kN / kPa</span></div><div class="drawing-sheet"><div class="drawing-title"><span>SECTION A–A</span><span>幾何示意 · 尺寸單位 m</span></div><svg id="section" viewBox="0 0 640 430" role="img" aria-label="擋土牆斷面、牆身及底版尺寸標註"></svg><div class="drawing-legend"><span><i class="legend-concrete"></i>混凝土</span><span><i class="legend-soil"></i>背填土</span><span><i class="legend-force"></i>土壓方向</span><span>非施工圖</span></div></div><div id="geometry" class="geometry-strip"></div></article>
+<article class="card" id="results-panel"><div class="panel-heading"><div><span class="section-number">03</span><h2>各工況穩定檢核</h2></div><span>計算值／門檻／判定</span></div><div class="panel-body" id="results"></div></article>
+<article class="card" id="review-panel"><div class="panel-heading"><div><span class="section-number">04</span><h2>設計待辦與限制</h2></div><span>完整性檢查</span></div><div class="panel-body" id="review-list"></div></article>
+<article class="card" id="scope"><div class="panel-heading"><div><span class="section-number">05</span><h2>計算明細與法規依據</h2></div><span>可追溯分析紀錄</span></div><div class="panel-body" id="details"></div></article>
+</section>
+</div>
+</div>
+<section id="report-panel" hidden><div class="report-tools"><button id="back">← 返回工程工作區</button><button id="print" class="primary"><svg class="icon"><use href="#i-report"/></svg>列印／另存 PDF</button></div><article id="report-document"></article></section>
+<footer><span>RETAINING WALL ANALYSIS <b>／</b> 資料儲存於此瀏覽器，請匯出備份。</span><a href="https://github.com/davida02617/-RetainingWall-Analysis" target="_blank" rel="noopener">原始碼與版本紀錄 ↗</a></footer>
 <noscript>請啟用 JavaScript 才能執行分析。</noscript>
 </main>
 <script type="module" src="app.mjs"></script>
-</body></html>
+</body>
+</html>
