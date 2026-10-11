@@ -1,0 +1,6 @@
+services:
+  retaining-wall:
+    build: .
+    ports:
+      - "127.0.0.1:8788:8788"
+    restart: unless-stopped
